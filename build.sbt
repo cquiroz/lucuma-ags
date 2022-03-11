@@ -11,7 +11,7 @@ val catsVersion          = "2.7.0"
 // val http4sJdkHttpClientVersion  = "0.5.0"
 // val fs2Version                  = "3.2.4"
 // val kindProjectorVersion        = "0.13.2"
-val lucumaCoreVersion    = "0.25.0"
+val lucumaCoreVersion    = "0.26.0"
 val lucumaCatalogVersion = "0.10.1"
 // val slf4jVersion                = "1.7.35"
 // val log4catsVersion             = "2.2.0"
@@ -22,6 +22,7 @@ val lucumaCatalogVersion = "0.10.1"
 // val natcchezHttp4sVersion       = "0.3.2"
 // val natchezVersion              = "0.1.6"
 val munitVersion         = "0.7.29"
+val mouseVersion         = "1.0.10"
 // val disciplineMunitVersion      = "1.0.9"
 // val gatlingVersion              = "3.7.4"
 
@@ -56,6 +57,7 @@ lazy val ags = crossProject(JVMPlatform, JSPlatform)
       "edu.gemini"    %%% "lucuma-core"         % lucumaCoreVersion,
       "edu.gemini"    %%% "lucuma-catalog"      % lucumaCatalogVersion,
       "org.typelevel" %%% "cats-core"           % catsVersion,
+      "org.typelevel" %%% "mouse"               % mouseVersion,
       // "org.typelevel"  %% "cats-effect"              % catsEffectVersion,
       // "org.http4s"     %% "http4s-async-http-client" % http4sVersion,
       // "org.http4s"     %% "http4s-circe"             % http4sVersion,

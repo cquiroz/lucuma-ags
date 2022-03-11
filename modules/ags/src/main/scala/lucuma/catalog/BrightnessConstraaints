@@ -1,0 +1,171 @@
+// Copyright (c) 2016-2022 Association of Universities for Research in Astronomy, Inc. (AURA)
+// For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
+
+package lucuma.catalog
+
+import cats.Order
+import cats.syntax.all._
+import lucuma.core.enum.Band
+import lucuma.core.math.BrightnessValue
+import lucuma.core.model.SourceProfile
+import mouse.all._
+
+/**
+ * Interface for a constraint to be applied to a certain brightness
+ */
+sealed trait BrightnessValueConstraint {
+  val brightness: BrightnessValue
+  def contains(v: BrightnessValue): Boolean
+
+  /**
+   * Constructs a brightness out of the band parameter
+   */
+  // def tobrightness(band: Band): Brightness[Integrated] = new Magnitude(brightness, band)
+}
+
+/**
+ * Constrain a target if a brightness is fainter than a threshold
+ */
+case class FaintnessConstraint(brightness: BrightnessValue) extends BrightnessValueConstraint {
+  override def contains(v: BrightnessValue): Boolean =
+    v <= brightness
+}
+
+object FaintnessConstraint {
+
+  /** @group Constructor */
+  def apply(v: Double): FaintnessConstraint = FaintnessConstraint(BrightnessValue.fromDouble(v))
+
+  /** @group Typeclass Instances */
+  implicit val order: Order[FaintnessConstraint] =
+    Order.by(_.brightness)
+}
+
+/**
+ * Constrain a target's if a brightness is brighter than a threshold
+ */
+case class SaturationConstraint(brightness: BrightnessValue) extends BrightnessValueConstraint {
+  override def contains(v: BrightnessValue): Boolean = v >= brightness
+}
+
+object SaturationConstraint {
+
+  /** @group Constructor */
+  def apply(v: Double): SaturationConstraint = SaturationConstraint(BrightnessValue.fromDouble(v))
+
+  /** @group Typeclass Instances */
+  implicit val order: Order[SaturationConstraint] =
+    Order.by(_.brightness)
+}
+
+sealed trait BrightnessFilter {
+  def filter(t: SourceProfile): Boolean
+
+  def searchBands: BandsList
+  def faintnessConstraint: FaintnessConstraint
+  def saturationConstraint: Option[SaturationConstraint]
+}
+
+// /**
+//  * Defines a typeclass of classes that can adjust brightnessConstraints, e.g. given certain
+//  * conditions
+//  */
+// trait ConstraintsAdjuster[T] {
+//   def adjust(t: T, mc: brightnessConstraints): MagnitudeConstraints
+// }
+//
+// object ConstraintsAdjuster {
+//
+//   /**
+//    * This is a rigid brightness constraint adjuster that can, for one magnitude adjuster (IQ, SB, CC)
+//    * uniformly adjust faintness and saturation levels uniformly.
+//    */
+//   def frombrightnessAdjuster[M <: MagnitudeAdjuster]: ConstraintsAdjuster[M] =
+//     new ConstraintsAdjuster[M] {
+//       override def adjust(t: M, mc: brightnessConstraints): MagnitudeConstraints =
+//         mc.adjust(_ + t.getAdjustment(mc.searchBands))
+//     }
+//
+//   /**
+//    * This is a flexible brightness constraint adjuster that:
+//    *   1. Allows interactions of brightness adjusters to determine the adjustments to the faintness
+//    *      and saturation levels. 2. Does not require the faintness and saturation level to be
+//    *      adjusted uniformly.
+//    */
+//   def customConstraintsAdjuster(
+//     f: (Conditions, BandsList) => Double,
+//     s: (Conditions, BandsList) => Double
+//   ): ConstraintsAdjuster[Conditions] = new ConstraintsAdjuster[Conditions] {
+//     override def adjust(c: Conditions, mc: brightnessConstraints): MagnitudeConstraints =
+//       mc.adjust(_ + f(c, mc.searchBands), _ + s(c, mc.searchBands))
+//   }
+// }
+//
+/**
+ * Describes constraints for the brightness of a target
+ */
+case class BrightnessConstraints(
+  searchBands:          BandsList,
+  faintnessConstraint:  FaintnessConstraint,
+  saturationConstraint: Option[SaturationConstraint]
+) extends BrightnessFilter {
+
+  override def filter(t: SourceProfile): Boolean =
+    searchBands.extract(t).exists(Function.tupled(contains))
+
+  /**
+   * Determines whether the brightness limits include the given magnitude value.
+   */
+  def contains(b: Band, m: BrightnessValue): Boolean =
+    searchBands.bandSupported(b) &&
+      faintnessConstraint.contains(m) &&
+      saturationConstraint.forall(_.contains(m))
+
+  /**
+   * Returns a combination of two BrightnessConstraints(this and that) such that the faintness limit
+   * is the faintest of the two and the saturation limit is the brightest of the two. In other
+   * words, the widest possible range of brightness bands.
+   */
+  def union(that: BrightnessConstraints): Option[BrightnessConstraints] =
+    (searchBands === that.searchBands).option {
+      val faintness = faintnessConstraint.max(that.faintnessConstraint)
+
+      // Calculate the min saturation limit if both are defined
+      val saturation = (saturationConstraint, that.saturationConstraint).mapN(_ min _)
+
+      BrightnessConstraints(searchBands, faintness, saturation)
+    }
+
+//   /**
+//    * Adjust the faintness limit and the saturation limit uniformly by a common function.
+//    */
+//   def adjust(f: Double => Double): brightnessConstraints =
+//     adjust(f, f)
+//
+//   /**
+//    * Can adjust the faintness limit and the saturation limit independently.
+//    */
+//   def adjust(f: Double => Double, s: Double => Double): brightnessConstraints = {
+//     val fl = f(faintnessConstraint.brightness)
+//     val sl = saturationConstraint.map(_.brightness).map(s)
+//     brightnessConstraints(searchBands, FaintnessConstraint(fl), sl.map(SaturationConstraint.apply))
+//   }
+}
+//
+object BrightnessConstraints {
+
+  /** @group Constructor */
+  def apply(
+    band: Band,
+    fc:   FaintnessConstraint,
+    sc:   Option[SaturationConstraint]
+  ): BrightnessConstraints = BrightnessConstraints(SingleBand(band), fc, sc)
+
+//   def unbounded(searchBands: BandsList): brightnessConstraints =
+//     brightnessConstraints(
+//       searchBands,
+//       FaintnessConstraint(Double.MaxValue),
+//       Some(SaturationConstraint(Double.MinValue))
+//     )
+//
+}
